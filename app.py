@@ -7,7 +7,7 @@ from flask import (Flask, render_template, request, redirect,
                    url_for, session, flash, jsonify)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import sqlite3, os, uuid
+import os, uuid
 from functools import wraps
 
 app = Flask(__name__)
@@ -30,12 +30,13 @@ CATEGORIES = [
 ]
 
 # ── Database ──────────────────────────────────────────────────────────────────
-def get_db():
-    db = sqlite3.connect('skillearn.db')
-    db.row_factory = sqlite3.Row
-    return db
+import psycopg2
+import os
 
-def init_db():
+def get_db():
+    return psycopg2.connect(os.environ.get("DATABASE_URL"))
+
+#def init_db():
     db = get_db()
     db.executescript('''
         CREATE TABLE IF NOT EXISTS users (
@@ -71,6 +72,52 @@ def init_db():
         );
     ''')
     db.commit()
+    db.close()
+#
+
+def init_db():
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        bio TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        skills TEXT DEFAULT '',
+        avatar TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        filename TEXT NOT NULL,
+        media_type TEXT DEFAULT 'image',
+        caption TEXT,
+        price TEXT,
+        category TEXT,
+        likes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS post_likes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        post_id INTEGER,
+        UNIQUE(user_id, post_id)
+    );
+    """)
+
+    db.commit()
+    cur.close()
     db.close()
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -352,3 +399,4 @@ def delete_post(post_id):
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
+
