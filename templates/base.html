@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}SkillEarn{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+{% if session.user_id %}
+<!-- ── Desktop Sidebar ─────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <a href="{{ url_for('feed') }}" class="sidebar-brand">
+    <div class="brand-mark">⚡</div>
+    <span>Skill<strong>Earn</strong></span>
+  </a>
+
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('feed') }}" class="sn-link {% if request.endpoint=='feed' %}active{% endif %}">
+      <span class="sn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </span>
+      <span>Feed</span>
+    </a>
+    <a href="{{ url_for('upload') }}" class="sn-link sn-post {% if request.endpoint=='upload' %}active{% endif %}">
+      <span class="sn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      </span>
+      <span>Post Skill</span>
+    </a>
+    <a href="{{ url_for('profile') }}" class="sn-link {% if request.endpoint=='profile' %}active{% endif %}">
+      <span class="sn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </span>
+      <span>Profile</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <div class="sidebar-user">
+      <div class="su-avatar">{{ session.user_name[0]|upper }}</div>
+      <div class="su-info">
+        <span class="su-name">{{ session.user_name }}</span>
+        <small>Freelancer</small>
+      </div>
+    </div>
+    <a href="{{ url_for('logout') }}" class="sn-link sn-logout">
+      <span class="sn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </span>
+      <span>Logout</span>
+    </a>
+  </div>
+</aside>
+
+<!-- ── Mobile Top Bar ─────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <a href="{{ url_for('feed') }}" class="topbar-brand">⚡ Skill<strong>Earn</strong></a>
+  <form action="{{ url_for('feed') }}" method="GET" class="topbar-search">
+    <input type="text" name="search" placeholder="Search skills…" value="{{ request.args.get('search','') }}"/>
+    <button type="submit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+  </form>
+</header>
+{% endif %}
+
+<!-- ── Flash Messages ─────────────────────────────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="toast-stack">
+    {% for cat, msg in messages %}
+    <div class="toast toast-{{ cat }}">
+      <span class="toast-icon">{% if cat=='success' %}✅{% elif cat=='error' %}❌{% else %}ℹ️{% endif %}</span>
+      <span>{{ msg }}</span>
+      <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ── Page Content ───────────────────────────────────────────────────────── -->
+<main class="page-wrap {% if not session.user_id %}page-auth{% endif %}">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ── Mobile Bottom Nav ──────────────────────────────────────────────────── -->
+{% if session.user_id %}
+<nav class="bottom-nav">
+  <a href="{{ url_for('feed') }}"    class="bn-item {% if request.endpoint=='feed'    %}active{% endif %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>Feed</span></a>
+  <a href="{{ url_for('upload') }}"  class="bn-item bn-post"><div class="bn-post-circle">+</div></a>
+  <a href="{{ url_for('profile') }}" class="bn-item {% if request.endpoint=='profile' %}active{% endif %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span></a>
+</nav>
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

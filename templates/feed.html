@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Feed – SkillEarn{% endblock %}
+{% block content %}
+
+<div class="feed-layout">
+
+  <!-- Left: Feed -->
+  <div class="feed-main">
+
+    <!-- Search bar (desktop) -->
+    <div class="feed-search-bar">
+      <form action="{{ url_for('feed') }}" method="GET" class="fsb-form">
+        <span class="fsb-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input type="text" name="search" placeholder="Search skills, people, categories…" value="{{ search }}" class="fsb-input"/>
+        {% if category %}<input type="hidden" name="category" value="{{ category }}"/>{% endif %}
+        <button type="submit" class="fsb-btn">Search</button>
+      </form>
+    </div>
+
+    <!-- Category chips -->
+    <div class="cat-scroll">
+      <a href="{{ url_for('feed', search=search) }}" class="cat-chip {% if not category %}active{% endif %}">✨ All</a>
+      {% for cat in CATEGORIES %}
+      <a href="{{ url_for('feed', category=cat, search=search) }}" class="cat-chip {% if category==cat %}active{% endif %}">{{ cat }}</a>
+      {% endfor %}
+    </div>
+
+    <!-- Feed title -->
+    <div class="feed-title-row">
+      <div>
+        <h2 class="feed-title">
+          {% if search %}Results for "{{ search }}"
+          {% elif category %}{{ category }}
+          {% else %}Latest Skills
+          {% endif %}
+        </h2>
+        <span class="feed-meta">{{ posts|length }} post{{ 's' if posts|length != 1 else '' }}</span>
+      </div>
+      <a href="{{ url_for('upload') }}" class="btn-post-inline">+ Post Skill</a>
+    </div>
+
+    <!-- Posts grid -->
+    {% if posts %}
+    <div class="posts-grid">
+      {% for p in posts %}
+      <article class="post-card" id="post-{{ p.id }}">
+
+        <!-- Media -->
+        <div class="pc-media">
+          {% if p.media_type == 'video' %}
+          <video class="pc-video" preload="none" controls>
+            <source src="{{ url_for('static', filename='uploads/' + p.filename) }}">
+          </video>
+          <div class="pc-video-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg> VIDEO
+          </div>
+          {% else %}
+          <img src="{{ url_for('static', filename='uploads/' + p.filename) }}"
+               alt="{{ p.caption }}" class="pc-img" loading="lazy"/>
+          {% endif %}
+          {% if p.price %}
+          <div class="pc-price">₹{{ p.price }}</div>
+          {% endif %}
+          {% if p.category %}
+          <div class="pc-cat-badge">{{ p.category }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Body -->
+        <div class="pc-body">
+          <a href="{{ url_for('profile', user_id=p.user_id) }}" class="pc-user">
+            <div class="pc-avatar">
+              {% if p.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' + p.avatar) }}" alt="{{ p.name }}"/>
+              {% else %}
+              <div class="pc-avatar-letter">{{ p.name[0]|upper }}</div>
+              {% endif %}
+            </div>
+            <div>
+              <div class="pc-name">{{ p.name }}</div>
+              {% if p.user_skills %}
+              <div class="pc-skill-preview">{{ p.user_skills.split(',')[0].strip() }}</div>
+              {% endif %}
+            </div>
+          </a>
+
+          <p class="pc-caption">{{ p.caption }}</p>
+
+          {% if p.user_skills %}
+          <div class="pc-tags">
+            {% for s in p.user_skills.split(',')[:3] %}
+            {% if s.strip() %}<span class="pc-tag">{{ s.strip() }}</span>{% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Actions -->
+        <div class="pc-actions">
+          <button class="pca-like {% if p.id in liked_posts %}liked{% endif %}"
+                  onclick="likePost({{ p.id }}, this)"
+                  aria-label="Like">
+            <span class="like-heart">{% if p.id in liked_posts %}❤️{% else %}🤍{% endif %}</span>
+            <span class="like-num">{{ p.likes }}</span>
+          </button>
+
+          <div class="pca-right">
+            {% if p.phone %}
+            <a href="https://wa.me/{{ p.phone | replace('+','') | replace(' ','') }}"
+               target="_blank" rel="noopener" class="pca-wa">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+              WhatsApp
+            </a>
+            {% else %}
+            <a href="{{ url_for('profile', user_id=p.user_id) }}" class="pca-view">View Profile</a>
+            {% endif %}
+          </div>
+        </div>
+
+      </article>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <div class="es-icon">{{ '🔍' if search else '📭' }}</div>
+      <h3>{{ 'No results for "' + search + '"' if search else 'No posts yet' }}</h3>
+      <p>{{ 'Try different keywords or browse all categories.' if search else 'Be the first to share a skill!' }}</p>
+      <a href="{{ url_for('upload') }}" class="btn-hero-primary" style="margin-top:16px">Post Your Skill</a>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right: Sidebar widget -->
+  <aside class="feed-sidebar">
+    <div class="fsw-card">
+      <h3>📢 Post Your Skill</h3>
+      <p>Have a talent? Share it and start getting hired today.</p>
+      <a href="{{ url_for('upload') }}" class="btn-hero-primary" style="width:100%;justify-content:center;">+ Post a Skill</a>
+    </div>
+
+    <div class="fsw-card">
+      <h3>🔥 Browse by Category</h3>
+      <div class="fsw-cats">
+        {% for cat in CATEGORIES %}
+        <a href="{{ url_for('feed', category=cat) }}" class="fsw-cat {% if category==cat %}active{% endif %}">{{ cat }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="fsw-card fsw-cta">
+      <p>💡 Add your WhatsApp number in your profile so clients can contact you directly.</p>
+      <a href="{{ url_for('edit_profile') }}">Update Profile →</a>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}

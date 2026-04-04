@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Sign Up – SkillEarn{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block content %}
+
+<div class="auth-wrap">
+  <div class="auth-left">
+    <div class="auth-left-inner">
+      <a href="{{ url_for('splash') }}" class="auth-brand">⚡ Skill<strong>Earn</strong></a>
+      <h2 class="auth-left-headline">Your skills are your resume.</h2>
+      <p>Join thousands of students and freelancers already earning on SkillEarn.</p>
+      <ul class="auth-left-list">
+        <li>✅ 100% free to join</li>
+        <li>✅ No experience needed</li>
+        <li>✅ Set your own prices</li>
+        <li>✅ Get hired via WhatsApp</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h1>Create your account</h1>
+        <p>Start earning with your skills today – it's free</p>
+      </div>
+
+      <form method="POST" class="auth-form" novalidate>
+        <div class="field-row">
+          <div class="field-group">
+            <label>Full Name <span class="req">*</span></label>
+            <div class="field-wrap">
+              <span class="field-prefix">👤</span>
+              <input type="text" name="name" placeholder="Rahul Sharma" required/>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Email <span class="req">*</span></label>
+            <div class="field-wrap">
+              <span class="field-prefix">📧</span>
+              <input type="email" name="email" placeholder="you@example.com" required/>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Password <span class="req">*</span></label>
+            <div class="field-wrap">
+              <span class="field-prefix">🔒</span>
+              <input type="password" name="password" id="pw-signup" placeholder="Min. 6 chars" required minlength="6"/>
+              <button type="button" class="pw-toggle" data-target="pw-signup">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>WhatsApp / Phone</label>
+            <div class="field-wrap">
+              <span class="field-prefix">📱</span>
+              <input type="tel" name="phone" placeholder="+91 98765 43210"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Your Skills <small>(comma-separated)</small></label>
+          <div class="field-wrap">
+            <span class="field-prefix">⭐</span>
+            <input type="text" name="skills" id="skills-input" placeholder="Logo Design, Video Editing, Web Dev…"/>
+          </div>
+          <div class="chip-row" id="chip-row"></div>
+          <small class="field-hint">Tip: Add more skills = more visibility</small>
+        </div>
+
+        <button type="submit" class="btn-auth">Create Free Account →</button>
+      </form>
+
+      <p class="auth-switch">
+        Already on SkillEarn? <a href="{{ url_for('login') }}">Log in</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  const inp = document.getElementById('skills-input');
+  const row = document.getElementById('chip-row');
+  inp && inp.addEventListener('input', () => {
+    const tags = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+    row.innerHTML = tags.map(t => `<span class="chip">${t}</span>`).join('');
+  });
+</script>
+{% endblock %}

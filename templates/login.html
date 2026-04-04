@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Login – SkillEarn{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block content %}
+
+<div class="auth-wrap">
+  <div class="auth-left">
+    <div class="auth-left-inner">
+      <a href="{{ url_for('splash') }}" class="auth-brand">⚡ Skill<strong>Earn</strong></a>
+      <h2 class="auth-left-headline">Turn your skills into a paycheck.</h2>
+      <p>India's simplest micro-job platform for students and freshers.</p>
+      <div class="auth-left-pills">
+        <span>🎨 Design</span><span>💻 Coding</span>
+        <span>🎬 Editing</span><span>📸 Photo</span>
+        <span>✍️ Writing</span><span>🎵 Music</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h1>Welcome back 👋</h1>
+        <p>Log in to your SkillEarn account</p>
+      </div>
+
+      <form method="POST" class="auth-form" novalidate>
+        <div class="field-group">
+          <label>Email address</label>
+          <div class="field-wrap">
+            <span class="field-prefix">📧</span>
+            <input type="email" name="email" placeholder="you@example.com" required autocomplete="email"/>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Password</label>
+          <div class="field-wrap">
+            <span class="field-prefix">🔒</span>
+            <input type="password" name="password" id="pw-login" placeholder="Your password" required autocomplete="current-password"/>
+            <button type="button" class="pw-toggle" data-target="pw-login">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-auth">Log In</button>
+      </form>
+
+      <p class="auth-switch">
+        New to SkillEarn? <a href="{{ url_for('signup') }}">Create a free account</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
