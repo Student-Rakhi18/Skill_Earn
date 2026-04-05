@@ -462,6 +462,24 @@ def delete_post(post_id):
     return redirect(url_for('profile'))
 
 
+
+#---- temporary Route-----------------------------------------------------------
+
+@app.route('/user_count')
+def user_count():
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM users")
+    count = cur.fetchone()[0]
+
+    cur.close()
+    db.close()
+
+    return f"Total Users: {count}"
+
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
