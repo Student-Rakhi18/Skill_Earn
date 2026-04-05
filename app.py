@@ -34,46 +34,9 @@ import psycopg2
 import os
 
 def get_db():
-    return psycopg2.connect(os.environ.get("DATABASE_URL"))
-
-#def init_db():
-    db = get_db()
-    db.executescript('''
-        CREATE TABLE IF NOT EXISTS users (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            name       TEXT    NOT NULL,
-            email      TEXT    UNIQUE NOT NULL,
-            password   TEXT    NOT NULL,
-            bio        TEXT    DEFAULT '',
-            phone      TEXT    DEFAULT '',
-            skills     TEXT    DEFAULT '',
-            avatar     TEXT    DEFAULT '',
-            created_at TEXT    DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS posts (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            filename   TEXT    NOT NULL,
-            media_type TEXT    NOT NULL DEFAULT 'image',
-            caption    TEXT    NOT NULL,
-            price      TEXT    DEFAULT '',
-            category   TEXT    DEFAULT '',
-            likes      INTEGER DEFAULT 0,
-            created_at TEXT    DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS post_likes (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            post_id INTEGER NOT NULL,
-            UNIQUE(user_id, post_id)
-        );
-    ''')
-    db.commit()
-    db.close()
-#
+    return psycopg2.connect(
+        "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db"
+    )
 
 def init_db():
     db = get_db()
@@ -156,40 +119,58 @@ def signup():
         return redirect(url_for('feed'))
 
     if request.method == 'POST':
-        name     = request.form.get('name',     '').strip()
-        email    = request.form.get('email',    '').strip().lower()
+        name     = request.form.get('name', '').strip()
+        email    = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        skills   = request.form.get('skills',   '').strip()
-        phone    = request.form.get('phone',    '').strip()
+        skills   = request.form.get('skills', '').strip()
+        phone    = request.form.get('phone', '').strip()
 
         if not name or not email or not password:
             flash('Please fill in all required fields.', 'error')
             return render_template('signup.html')
+
         if len(password) < 6:
             flash('Password must be at least 6 characters.', 'error')
             return render_template('signup.html')
 
         db = get_db()
-        if db.execute('SELECT id FROM users WHERE email=?', (email,)).fetchone():
-            flash('Email already registered. Please log in.', 'error')
+        cur = db.cursor()
+
+        # ✅ check existing user
+        cur.execute('SELECT id FROM users WHERE email=%s', (email,))
+        if cur.fetchone():
+            flash('Email already registered.', 'error')
+            cur.close()
             db.close()
             return render_template('signup.html')
 
-        db.execute(
-            'INSERT INTO users (name,email,password,skills,phone) VALUES (?,?,?,?,?)',
-            (name, email, generate_password_hash(password), skills, phone)
+        # ✅ FIX: hash password
+        hashed_password = generate_password_hash(password)
+
+        # ✅ insert user
+        cur.execute(
+            '''
+            INSERT INTO users (name, email, password, skills, phone)
+            VALUES (%s, %s, %s, %s, %s)
+            ''',
+            (name, email, hashed_password, skills, phone)
         )
         db.commit()
-        user = db.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
+
+        # ✅ fetch user (FIX: %s not ?)
+        cur.execute('SELECT * FROM users WHERE email=%s', (email,))
+        user = cur.fetchone()
+
+        cur.close()
         db.close()
 
-        session['user_id']   = user['id']
-        session['user_name'] = user['name']
+        session['user_id']   = user[0]
+        session['user_name'] = user[1]
+
         flash(f'Welcome to SkillEarn, {name}! 🎉', 'success')
         return redirect(url_for('feed'))
 
     return render_template('signup.html')
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -197,28 +178,35 @@ def login():
         return redirect(url_for('feed'))
 
     if request.method == 'POST':
-        email    = request.form.get('email',    '').strip().lower()
+        email    = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
         if not email or not password:
             flash('Please enter your email and password.', 'error')
             return render_template('login.html')
 
-        db   = get_db()
-        user = db.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
+        db = get_db()
+        cur = db.cursor()
+
+        cur.execute('SELECT * FROM users WHERE email=%s', (email,))
+        user = cur.fetchone()
+
+        cur.close()
         db.close()
 
-        if not user or not check_password_hash(user['password'], password):
+        # ✅ FIX: index use karo, dict nahi
+        if not user or not check_password_hash(user[3], password):
             flash('Invalid email or password.', 'error')
             return render_template('login.html')
 
-        session['user_id']   = user['id']
-        session['user_name'] = user['name']
-        flash(f'Welcome back, {user["name"]}! 👋', 'success')
+        session['user_id']   = user[0]
+        session['user_name'] = user[1]
+
+        flash(f'Welcome back, {user[1]}! 👋', 'success')
+
         return redirect(url_for('feed'))
 
     return render_template('login.html')
-
 
 @app.route('/logout')
 def logout():
@@ -229,40 +217,57 @@ def logout():
 @app.route('/feed')
 @login_required
 def feed():
-    db       = get_db()
+    db  = get_db()
+    cur = db.cursor()
+
     category = request.args.get('category', '').strip()
-    search   = request.args.get('search',   '').strip()
+    search   = request.args.get('search', '').strip()
 
-    query  = '''SELECT p.*, u.name, u.phone, u.skills AS user_skills, u.avatar
-                FROM posts p JOIN users u ON p.user_id = u.id'''
+    query = """SELECT p.*, u.name, u.phone, u.skills, u.avatar
+               FROM posts p
+               JOIN users u ON p.user_id = u.id"""
+
     params = []
-    conds  = []
+    conds = []
 
+    # ✅ FILTERS FIX
     if category:
-        conds.append('p.category = ?')
+        conds.append("p.category = %s")
         params.append(category)
+
     if search:
-        conds.append('(p.caption LIKE ? OR u.name LIKE ? OR p.category LIKE ?)')
-        params += [f'%{search}%', f'%{search}%', f'%{search}%']
+        conds.append("(p.caption ILIKE %s OR u.name ILIKE %s OR p.category ILIKE %s)")
+        params += [f"%{search}%", f"%{search}%", f"%{search}%"]
+
     if conds:
-        query += ' WHERE ' + ' AND '.join(conds)
-    query += ' ORDER BY p.created_at DESC'
+        query += " WHERE " + " AND ".join(conds)
 
-    posts = db.execute(query, params).fetchall()
-    liked = {r['post_id'] for r in
-             db.execute('SELECT post_id FROM post_likes WHERE user_id=?',
-                        (session['user_id'],)).fetchall()}
+    query += " ORDER BY p.created_at DESC"
+
+    # ✅ EXECUTE QUERY
+    cur.execute(query, params)
+    posts = cur.fetchall()
+
+    # ✅ LIKED POSTS FIX
+    cur.execute("SELECT post_id FROM post_likes WHERE user_id=%s", (session['user_id'],))
+    liked = {row[0] for row in cur.fetchall()}
+
+    cur.close()
     db.close()
-    return render_template('feed.html', posts=posts, liked_posts=liked,
-                           category=category, search=search)
 
-
+    return render_template(
+        'feed.html',
+        posts=posts,
+        liked_posts=liked,
+        category=category,
+        search=search
+    )
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload():
     if request.method == 'POST':
-        caption  = request.form.get('caption',  '').strip()
-        price    = request.form.get('price',    '').strip()
+        caption  = request.form.get('caption', '').strip()
+        price    = request.form.get('price', '').strip()
         category = request.form.get('category', '').strip()
 
         if not caption:
@@ -275,7 +280,7 @@ def upload():
 
         file = request.files['media']
         if not allowed_file(file.filename):
-            flash('Unsupported file type. Use JPG, PNG, GIF, WEBP, MP4, MOV, WEBM.', 'error')
+            flash('Unsupported file type.', 'error')
             return render_template('upload.html')
 
         ext        = file.filename.rsplit('.', 1)[1].lower()
@@ -283,68 +288,104 @@ def upload():
         media_type = 'video' if is_video(file.filename) else 'image'
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-        db = get_db()
-        db.execute(
-            'INSERT INTO posts (user_id,filename,media_type,caption,price,category) VALUES (?,?,?,?,?,?)',
+        # ✅ FIX START
+        db  = get_db()
+        cur = db.cursor()
+
+        cur.execute(
+            '''
+            INSERT INTO posts (user_id, filename, media_type, caption, price, category)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ''',
             (session['user_id'], filename, media_type, caption, price, category)
         )
+
         db.commit()
+        cur.close()
         db.close()
+        # ✅ FIX END
+
         flash('Your skill is live! 🚀', 'success')
         return redirect(url_for('feed'))
 
     return render_template('upload.html')
-
-
 @app.route('/profile', defaults={'user_id': None})
 @app.route('/profile/<int:user_id>')
 @login_required
 def profile(user_id):
     uid = user_id or session['user_id']
-    db  = get_db()
-    user  = db.execute('SELECT * FROM users WHERE id=?', (uid,)).fetchone()
+
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute('SELECT * FROM users WHERE id=%s', (uid,))
+    user = cur.fetchone()
+
     if not user:
         flash('User not found.', 'error')
+        cur.close()
         db.close()
         return redirect(url_for('feed'))
-    posts = db.execute(
-        'SELECT * FROM posts WHERE user_id=? ORDER BY created_at DESC', (uid,)
-    ).fetchall()
-    db.close()
-    is_own = (uid == session['user_id'])
-    return render_template('profile.html', user=user, posts=posts, is_own_profile=is_own)
 
+    cur.execute(
+        'SELECT * FROM posts WHERE user_id=%s ORDER BY created_at DESC',
+        (uid,)
+    )
+    posts = cur.fetchall()
+
+    cur.close()
+    db.close()
+
+    is_own = (uid == session['user_id'])
+
+    return render_template(
+        'profile.html',
+        user=user,
+        posts=posts,
+        is_own_profile=is_own
+    )
 
 @app.route('/profile/edit', methods=['GET', 'POST'])
 @login_required
 def edit_profile():
-    db   = get_db()
-    user = db.execute('SELECT * FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute('SELECT * FROM users WHERE id=%s', (session['user_id'],))
+    user = cur.fetchone()
 
     if request.method == 'POST':
-        name   = request.form.get('name',   '').strip()
-        bio    = request.form.get('bio',    '').strip()
-        phone  = request.form.get('phone',  '').strip()
+        name   = request.form.get('name', '').strip()
+        bio    = request.form.get('bio', '').strip()
+        phone  = request.form.get('phone', '').strip()
         skills = request.form.get('skills', '').strip()
-        avatar = user['avatar']
+        avatar = user[7] if user else ''   # index based
 
         if 'avatar' in request.files:
             av = request.files['avatar']
             if av and av.filename and allowed_file(av.filename):
-                ext    = av.filename.rsplit('.', 1)[1].lower()
+                ext = av.filename.rsplit('.', 1)[1].lower()
                 avatar = f"av_{uuid.uuid4().hex}.{ext}"
                 av.save(os.path.join(app.config['UPLOAD_FOLDER'], avatar))
 
-        db.execute(
-            'UPDATE users SET name=?,bio=?,phone=?,skills=?,avatar=? WHERE id=?',
+        cur.execute(
+            '''
+            UPDATE users
+            SET name=%s, bio=%s, phone=%s, skills=%s, avatar=%s
+            WHERE id=%s
+            ''',
             (name, bio, phone, skills, avatar, session['user_id'])
         )
+
         db.commit()
-        session['user_name'] = name
+        cur.close()
         db.close()
+
+        session['user_name'] = name
         flash('Profile updated! ✅', 'success')
         return redirect(url_for('profile'))
 
+    cur.close()
     db.close()
     return render_template('edit_profile.html', user=user)
 
@@ -353,50 +394,76 @@ def edit_profile():
 @login_required
 def like_post(post_id):
     db = get_db()
-    ex = db.execute(
-        'SELECT id FROM post_likes WHERE user_id=? AND post_id=?',
+    cur = db.cursor()
+
+    cur.execute(
+        'SELECT id FROM post_likes WHERE user_id=%s AND post_id=%s',
         (session['user_id'], post_id)
-    ).fetchone()
+    )
+    ex = cur.fetchone()
 
     if ex:
-        db.execute('DELETE FROM post_likes WHERE user_id=? AND post_id=?',
-                   (session['user_id'], post_id))
-        db.execute('UPDATE posts SET likes=MAX(0, likes-1) WHERE id=?', (post_id,))
+        cur.execute(
+            'DELETE FROM post_likes WHERE user_id=%s AND post_id=%s',
+            (session['user_id'], post_id)
+        )
+        cur.execute(
+            'UPDATE posts SET likes = GREATEST(likes-1, 0) WHERE id=%s',
+            (post_id,)
+        )
         liked = False
     else:
-        db.execute('INSERT INTO post_likes (user_id,post_id) VALUES (?,?)',
-                   (session['user_id'], post_id))
-        db.execute('UPDATE posts SET likes=likes+1 WHERE id=?', (post_id,))
+        cur.execute(
+            'INSERT INTO post_likes (user_id, post_id) VALUES (%s, %s)',
+            (session['user_id'], post_id)
+        )
+        cur.execute(
+            'UPDATE posts SET likes = likes+1 WHERE id=%s',
+            (post_id,)
+        )
         liked = True
 
-    count = db.execute('SELECT likes FROM posts WHERE id=?', (post_id,)).fetchone()['likes']
-    db.commit()
-    db.close()
-    return jsonify({'liked': liked, 'count': count})
+    cur.execute('SELECT likes FROM posts WHERE id=%s', (post_id,))
+    count = cur.fetchone()[0]
 
+    db.commit()
+    cur.close()
+    db.close()
+
+    return jsonify({'liked': liked, 'count': count})
 
 @app.route('/delete_post/<int:post_id>', methods=['POST'])
 @login_required
 def delete_post(post_id):
-    db   = get_db()
-    post = db.execute(
-        'SELECT * FROM posts WHERE id=? AND user_id=?',
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute(
+        'SELECT filename FROM posts WHERE id=%s AND user_id=%s',
         (post_id, session['user_id'])
-    ).fetchone()
+    )
+    post = cur.fetchone()
+
     if post:
-        fp = os.path.join(app.config['UPLOAD_FOLDER'], post['filename'])
-        if os.path.exists(fp):
-            os.remove(fp)
-        db.execute('DELETE FROM posts WHERE id=?', (post_id,))
-        db.execute('DELETE FROM post_likes WHERE post_id=?', (post_id,))
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], post[0])
+
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+        cur.execute('DELETE FROM posts WHERE id=%s', (post_id,))
+        cur.execute('DELETE FROM post_likes WHERE post_id=%s', (post_id,))
+
         db.commit()
         flash('Post removed.', 'info')
+
+    cur.close()
     db.close()
+
     return redirect(url_for('profile'))
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
