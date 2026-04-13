@@ -56,10 +56,13 @@
           <div class="pc-video-badge">
             <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg> VIDEO
           </div>
-          {% else %}
-          <img src="{{ url_for('static', filename='uploads/' + p.filename) }}"
-               alt="{{ p.caption }}" class="pc-img" loading="lazy"/>
-          {% endif %}
+            {% else %}
+            <a href="{{ url_for('view_post', post_id=p.id) }}">
+                <img src="{{ url_for('static', filename='uploads/' + p.filename) }}"
+                    alt="{{ p.caption }}"
+                    class="pc-img"/>
+            </a>
+            {% endif %}
           {% if p.price %}
           <div class="pc-price">₹{{ p.price }}</div>
           {% endif %}

@@ -60,3 +60,12 @@ const videoObs = new IntersectionObserver(entries => {
 }, { rootMargin: '200px' });
 
 document.querySelectorAll('video[preload="none"]').forEach(v => videoObs.observe(v));
+
+function openImage(src) {
+    document.getElementById("imgModal").style.display = "flex";
+    document.getElementById("modalImg").src = src;
+}
+
+function closeImage() {
+    document.getElementById("imgModal").style.display = "none";
+}

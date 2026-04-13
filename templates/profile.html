@@ -63,7 +63,7 @@
       <span>Likes</span>
     </div>
     <div class="psb-item">
-      <strong>{{ user.created_at[:7] if user.created_at else '–' }}</strong>
+      <strong>{{ user.created_at.strftime('%Y-%m') if user.created_at else '–' }}</strong>
       <span>Joined</span>
     </div>
     {% if not user.phone and is_own_profile %}
@@ -91,7 +91,12 @@
           <video class="pp-img" preload="none"><source src="{{ url_for('static', filename='uploads/' + post.filename) }}"></video>
           <div class="pp-video-icon">▶</div>
           {% else %}
-          <img src="{{ url_for('static', filename='uploads/' + post.filename) }}" class="pp-img" loading="lazy" alt="{{ post.caption }}"/>
+            <a href="{{ url_for('view_post', post_id=post.id) }}">
+                <img src="{{ url_for('static', filename='uploads/' + post.filename) }}"
+                     class="pp-img"
+                     loading="lazy"
+                     alt="{{ post.caption }}"/>
+            </a>
           {% endif %}
           {% if post.price %}
           <div class="pp-price">₹{{ post.price }}</div>

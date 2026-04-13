@@ -30,13 +30,14 @@ CATEGORIES = [
 ]
 
 # ── Database ──────────────────────────────────────────────────────────────────
-import psycopg2
+import psycopg2.extras
 import os
 
 def get_db():
     return psycopg2.connect(
-        "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db"
-    )
+    "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db",
+         cursor_factory=psycopg2.extras.RealDictCursor
+        )
 
 def init_db():
     db = get_db()
@@ -80,7 +81,8 @@ def init_db():
     """)
 
     cur.execute("SELECT COUNT(*) FROM users")
-    print("Total Users:", cur.fetchone()[0])
+    row = cur.fetchone()
+    print("Total Users:", row['count'])
 
     db.commit()
     cur.close()
@@ -253,7 +255,7 @@ def feed():
 
     # ✅ LIKED POSTS FIX
     cur.execute("SELECT post_id FROM post_likes WHERE user_id=%s", (session['user_id'],))
-    liked = {row[0] for row in cur.fetchall()}
+    liked = {row['post_id'] for row in cur.fetchall()}
 
     cur.close()
     db.close()
@@ -265,6 +267,7 @@ def feed():
         category=category,
         search=search
     )
+
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload():
@@ -289,7 +292,7 @@ def upload():
         ext        = file.filename.rsplit('.', 1)[1].lower()
         filename   = f"{uuid.uuid4().hex}.{ext}"
         media_type = 'video' if is_video(file.filename) else 'image'
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        file.save(os.path.join(app.root_path,'static','uploads', filename))
 
         # ✅ FIX START
         db  = get_db()
@@ -427,7 +430,8 @@ def like_post(post_id):
         liked = True
 
     cur.execute('SELECT likes FROM posts WHERE id=%s', (post_id,))
-    count = cur.fetchone()[0]
+    row = cur.fetchone()
+    count = row['likes'] if row else 0
 
     db.commit()
     cur.close()
@@ -448,7 +452,7 @@ def delete_post(post_id):
     post = cur.fetchone()
 
     if post:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], post[0])
+        filepath = os.path.join(app.root_path, 'static', 'uploads', post['filename'])
 
         if os.path.exists(filepath):
             os.remove(filepath)
@@ -464,8 +468,27 @@ def delete_post(post_id):
 
     return redirect(url_for('profile'))
 
+@app.route('/view_post/<int:post_id>')
+@login_required
+def view_post(post_id):
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("SELECT * FROM posts WHERE id = %s", (post_id,))
+    post = cur.fetchone()
+
+    cur.close()
+    db.close()
+
+    if not post:
+        flash("Post not found", "error")
+        return redirect(url_for('feed'))
+
+    return render_template("view_post.html", post=post)
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=port)

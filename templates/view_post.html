@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Post</title>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        img, video {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 18px;
+            text-decoration: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<a href="{{ url_for('feed') }}" class="back-btn">⬅ Back</a>
+
+{% if post.media_type == 'video' %}
+<video controls autoplay>
+    <source src="{{ url_for('static', filename='uploads/' + post.filename) }}">
+</video>
+{% else %}
+<img src="{{ url_for('static', filename='uploads/' + post.filename) }}">
+{% endif %}
+
+</body>
+</html>
