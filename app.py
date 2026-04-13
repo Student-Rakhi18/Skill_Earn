@@ -169,8 +169,8 @@ def signup():
         cur.close()
         db.close()
 
-        session['user_id']   = user[0]
-        session['user_name'] = user[1]
+        session['user_id']   = user['id']
+        session['user_name'] = user['name']
 
         flash(f'Welcome to SkillEarn, {name}! 🎉', 'success')
         return redirect(url_for('feed'))
@@ -200,12 +200,12 @@ def login():
         db.close()
 
         # ✅ FIX: index use karo, dict nahi
-        if not user or not check_password_hash(user[3], password):
+        if not user or not check_password_hash(user['password'], password):
             flash('Invalid email or password.', 'error')
             return render_template('login.html')
 
-        session['user_id']   = user[0]
-        session['user_name'] = user[1]
+        session['user_id']   = user['id']
+        session['user_name'] = user['name']
 
         flash(f'Welcome back, {user[1]}! 👋', 'success')
 
@@ -365,7 +365,7 @@ def edit_profile():
         bio    = request.form.get('bio', '').strip()
         phone  = request.form.get('phone', '').strip()
         skills = request.form.get('skills', '').strip()
-        avatar = user[7] if user else ''   # index based
+        avatar = user['avatar'] if user else ''   # index based
 
         if 'avatar' in request.files:
             av = request.files['avatar']
