@@ -11,7 +11,7 @@ import os, uuid
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'skillearn-change-this-in-production-2024'
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 UPLOAD_FOLDER    = os.path.join('static', 'uploads')
@@ -31,13 +31,13 @@ CATEGORIES = [
 
 # ── Database ──────────────────────────────────────────────────────────────────
 import psycopg2.extras
-import os
 
 def get_db():
     return psycopg2.connect(
-    "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db",
-         cursor_factory=psycopg2.extras.RealDictCursor
-        )
+        os.environ.get("DATABASE_URL") or
+        "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db",
+        cursor_factory=psycopg2.extras.RealDictCursor
+    )
 
 def init_db():
     db = get_db()
@@ -80,6 +80,39 @@ def init_db():
     );
     """)
 
+    cur.execute("""
+       CREATE TABLE IF NOT EXISTS messages (
+           id SERIAL PRIMARY KEY,
+           sender_id INTEGER,
+           receiver_id INTEGER,
+           message TEXT,
+           is_seen BOOLEAN DEFAULT FALSE,
+           deleted_by_sender BOOLEAN DEFAULT FALSE,
+           deleted_by_receiver BOOLEAN DEFAULT FALSE,
+           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+       );
+       """)
+
+    # ✅ AUTO FIX ALL MISSING COLUMNS
+    try:
+        cur.execute("""
+            ALTER TABLE messages 
+            ADD COLUMN IF NOT EXISTS is_seen BOOLEAN DEFAULT FALSE;
+        """)
+
+        cur.execute("""
+            ALTER TABLE messages 
+            ADD COLUMN IF NOT EXISTS deleted_by_sender BOOLEAN DEFAULT FALSE;
+        """)
+
+        cur.execute("""
+            ALTER TABLE messages 
+            ADD COLUMN IF NOT EXISTS deleted_by_receiver BOOLEAN DEFAULT FALSE;
+        """)
+
+    except Exception as e:
+        print("Column fix error:", e)
+
     cur.execute("SELECT COUNT(*) FROM users")
     row = cur.fetchone()
     print("Total Users:", row['count'])
@@ -103,6 +136,47 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
+
+@app.route('/delete_for_everyone/<int:msg_id>', methods=['POST'])
+@login_required
+def delete_for_everyone(msg_id):
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        DELETE FROM messages
+        WHERE id=%s AND sender_id=%s
+    """, (msg_id, session['user_id']))
+
+    db.commit()
+    cur.close()
+    db.close()
+
+    return jsonify({'status': 'deleted'})
+
+@app.route('/delete_for_me/<int:msg_id>', methods=['POST'])
+@login_required
+def delete_for_me(msg_id):
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        UPDATE messages
+        SET deleted_by_sender = TRUE
+        WHERE id=%s AND sender_id=%s
+    """, (msg_id, session['user_id']))
+
+    cur.execute("""
+        UPDATE messages
+        SET deleted_by_receiver = TRUE
+        WHERE id=%s AND receiver_id=%s
+    """, (msg_id, session['user_id']))
+
+    db.commit()
+    cur.close()
+    db.close()
+
+    return jsonify({'status': 'hidden'})
 
 # ── Context processor – makes categories available in all templates ────────────
 @app.context_processor
@@ -207,7 +281,7 @@ def login():
         session['user_id']   = user['id']
         session['user_name'] = user['name']
 
-        flash(f'Welcome back, {user[1]}! 👋', 'success')
+        flash(f"Welcome back, {user['name']}! 👋", 'success')
 
         return redirect(url_for('feed'))
 
@@ -228,7 +302,7 @@ def feed():
     category = request.args.get('category', '').strip()
     search   = request.args.get('search', '').strip()
 
-    query = """SELECT p.*, u.name, u.phone, u.skills, u.avatar
+    query = """SELECT p.*, u.name, u.phone, u.skills AS skills, u.avatar
                FROM posts p
                JOIN users u ON p.user_id = u.id"""
 
@@ -292,7 +366,7 @@ def upload():
         ext        = file.filename.rsplit('.', 1)[1].lower()
         filename   = f"{uuid.uuid4().hex}.{ext}"
         media_type = 'video' if is_video(file.filename) else 'image'
-        file.save(os.path.join(app.root_path,'static','uploads', filename))
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
         # ✅ FIX START
         db  = get_db()
@@ -324,6 +398,7 @@ def profile(user_id):
     db = get_db()
     cur = db.cursor()
 
+    # 👤 User fetch
     cur.execute('SELECT * FROM users WHERE id=%s', (uid,))
     user = cur.fetchone()
 
@@ -333,11 +408,19 @@ def profile(user_id):
         db.close()
         return redirect(url_for('feed'))
 
+    # 📸 Posts fetch
     cur.execute(
         'SELECT * FROM posts WHERE user_id=%s ORDER BY created_at DESC',
         (uid,)
     )
     posts = cur.fetchall()
+
+    # ❤️ IMPORTANT: liked posts fetch
+    cur.execute(
+        "SELECT post_id FROM post_likes WHERE user_id=%s",
+        (session['user_id'],)
+    )
+    liked_posts = {row['post_id'] for row in cur.fetchall()}
 
     cur.close()
     db.close()
@@ -348,7 +431,8 @@ def profile(user_id):
         'profile.html',
         user=user,
         posts=posts,
-        is_own_profile=is_own
+        is_own_profile=is_own,
+        liked_posts=liked_posts   # ✅ THIS WAS MISSING
     )
 
 @app.route('/profile/edit', methods=['GET', 'POST'])
@@ -486,9 +570,93 @@ def view_post(post_id):
 
     return render_template("view_post.html", post=post)
 
+@app.route('/chats')
+@login_required
+def chats():
+    db = get_db()
+    cur = db.cursor()
+
+    # sab users lao except current user
+    cur.execute("""
+        SELECT id, name, avatar FROM users
+        WHERE id != %s
+    """, (session['user_id'],))
+
+    users = cur.fetchall()
+
+    cur.close()
+    db.close()
+
+    return render_template("chats.html", users=users)
+
+
+@app.route('/chat/<int:user_id>')
+@login_required
+def chat(user_id):
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        UPDATE messages
+        SET is_seen = TRUE
+        WHERE receiver_id=%s AND sender_id=%s
+    """, (session['user_id'], user_id))
+
+    cur.execute("""
+        SELECT * FROM messages
+        WHERE (
+            (sender_id=%s AND receiver_id=%s AND deleted_by_sender=FALSE)
+            OR
+            (sender_id=%s AND receiver_id=%s AND deleted_by_receiver=FALSE)
+        )
+        ORDER BY created_at
+    """, (session['user_id'], user_id, user_id, session['user_id']))
+
+    messages = cur.fetchall()
+
+    cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
+    user = cur.fetchone()
+
+    db.commit()
+    cur.close()
+    db.close()
+
+    return render_template("chat.html", messages=messages, user=user)
+
+@app.route('/send_message', methods=['POST'])
+@login_required
+def send_message():
+    data = request.get_json()
+    receiver_id = data['receiver_id']
+    message = data['message']
+
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        INSERT INTO messages (sender_id, receiver_id, message)
+        VALUES (%s, %s, %s)
+        RETURNING id, created_at
+    """, (session['user_id'], receiver_id, message))
+
+    msg = cur.fetchone()
+
+    db.commit()
+    cur.close()
+    db.close()
+
+    return jsonify({
+        'status': 'ok',
+        'id': msg['id'],
+        'message': message,
+        'time': msg['created_at'].strftime("%H:%M"),
+        'sender_id': session['user_id']
+    })
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
+
+

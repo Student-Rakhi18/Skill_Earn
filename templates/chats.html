@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="chat-list">
+  <h2>💬 Chats</h2>
+
+  {% for u in users %}
+  <a href="{{ url_for('chat', user_id=u.id) }}" class="chat-user">
+
+    <div class="chat-avatar">
+      {% if u.avatar %}
+        <img src="{{ url_for('static', filename='uploads/' + u.avatar) }}">
+      {% else %}
+        <div class="chat-avatar-letter">{{ u.name[0]|upper }}</div>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="chat-name">{{ u.name }}</div>
+      <div class="chat-msg">Start conversation...</div>
+    </div>
+
+  </a>
+  {% endfor %}
+</div>
+
+{% endblock %}

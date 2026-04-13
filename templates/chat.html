@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="chat-container">
+
+  <div class="chat-header">
+    {{ user.name }}
+  </div>
+
+  <div class="chat-box">
+    {% for m in messages %}
+      <div class="msg {% if m.sender_id == session['user_id'] %}me{% else %}other{% endif %}">
+        {{ m.message }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="chat-input">
+    <input type="text" id="msg" placeholder="Type message...">
+    <button onclick="sendMsg()">Send</button>
+  </div>
+
+</div>
+
+<script>
+function sendMsg() {
+    let msg = document.getElementById("msg").value;
+
+    if (!msg.trim()) return;  // ❗ empty message block
+
+    fetch("/send_message", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            receiver_id: {{ user.id }},
+            message: msg
+        })
+    })
+    .then(() => location.reload());
+}
+</script>
+
+{% endblock %}
