@@ -6,12 +6,13 @@ Run: python app.py
 from flask import (Flask, render_template, request, redirect,
                    url_for, session, flash, jsonify)
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 import os, uuid
 from functools import wraps
 import cloudinary
 import cloudinary.uploader
 
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
@@ -664,24 +665,6 @@ def send_message():
         'time': msg['created_at'].strftime("%H:%M"),
         'sender_id': session['user_id']
     })
-
-@app.route('/clear_posts')
-@login_required
-def clear_posts():
-    if session['user_id'] != 1:
-        return "Not allowed"
-
-    db = get_db()
-    cur = db.cursor()
-
-    # delete DB posts
-    cur.execute("DELETE FROM posts;")
-
-    db.commit()
-    cur.close()
-    db.close()
-
-    return "Posts + files cleared"
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':

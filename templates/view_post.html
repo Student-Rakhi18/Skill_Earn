@@ -32,7 +32,7 @@
 </head>
 <body>
 
-<a href="{{ url_for('feed') }}" class="back-btn">⬅ Back</a>
+<a href="javascript:history.back()" class="back-btn">⬅ Back</a>
 
 {% if post.media_type == 'video' %}
 <video controls autoplay>

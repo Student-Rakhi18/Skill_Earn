@@ -10,7 +10,7 @@
     <div class="profile-top">
       <div class="profile-av-wrap">
         {% if user.avatar %}
-        <img src="{{ url_for('static', filename='uploads/' + user.avatar) }}"
+        <img src="{{ user.avatar }}"
              class="profile-av" alt="{{ user.name }}"/>
         {% else %}
         <div class="profile-av profile-av-letter">{{ user.name[0]|upper }}</div>
@@ -89,11 +89,13 @@
       <div class="pp-card">
         <div class="pp-media">
           {% if post.media_type == 'video' %}
-          <video class="pp-img" controls preload="metadata"><source src="{{ url_for('static', filename='uploads/' + post.filename) }}"></video>
+          <video class="pp-img" controls preload="metadata">
+              <source src="{{ post.filename }}">
+          </video>
           <div class="pp-video-icon">▶</div>
           {% else %}
             <a href="{{ url_for('view_post', post_id=post.id) }}">
-                <img src="{{ url_for('static', filename='uploads/' + post.filename) }}"
+                <img src="{{ post.filename }}"
                      onerror="this.src='/static/default.png'"
                      class="pp-img"
                      loading="lazy"
