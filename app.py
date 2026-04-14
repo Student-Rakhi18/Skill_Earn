@@ -39,7 +39,7 @@ import psycopg2.extras
 
 def get_db():
     return psycopg2.connect(
-        os.environ.get("DATABASE_URL"),
+        "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db",
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
