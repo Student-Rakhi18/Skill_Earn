@@ -20,8 +20,7 @@
       <div class="av-edit-row">
         <div class="av-preview" id="avPreview">
           {% if user.avatar %}
-          <img src="{{ url_for('static', filename='uploads/' + user.avatar) }}" id="avImg" alt="Avatar"/>
-          {% else %}
+<img src="{{ user.avatar }}" id="avImg" alt="Avatar"/>          {% else %}
           <div class="av-letter" id="avLetter">{{ user.name[0]|upper }}</div>
           {% endif %}
         </div>

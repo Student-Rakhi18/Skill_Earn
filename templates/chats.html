@@ -9,7 +9,7 @@
 
     <div class="chat-avatar">
       {% if u.avatar %}
-        <img src="{{ url_for('static', filename='uploads/' + u.avatar) }}">
+        <img src="{{ u.avatar) }}">
       {% else %}
         <div class="chat-avatar-letter">{{ u.name[0]|upper }}</div>
       {% endif %}

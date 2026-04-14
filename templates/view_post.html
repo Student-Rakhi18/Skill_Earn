@@ -36,10 +36,10 @@
 
 {% if post.media_type == 'video' %}
 <video controls autoplay>
-    <source src="{{ url_for('static', filename='uploads/' + post.filename) }}">
+    <source src="{{ post.filename }}">
 </video>
 {% else %}
-<img src="{{ url_for('static', filename='uploads/' + post.filename) }}">
+<img src="{{ post.filename }}">
 {% endif %}
 
 </body>

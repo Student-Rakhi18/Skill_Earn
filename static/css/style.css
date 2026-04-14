@@ -861,3 +861,10 @@ button, a, .post-card, .sn-link {
   --border: #1f2937;
   --muted: #9ca3af;
 }
+
+.pc-img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  background: #f2f2f2;
+}

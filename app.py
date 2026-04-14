@@ -9,20 +9,25 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os, uuid
 from functools import wraps
+import cloudinary
+import cloudinary.uploader
 
-app = Flask(__name__)
+
+app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUD_NAME"),
+    api_key=os.environ.get("API_KEY"),
+    api_secret=os.environ.get("API_SECRET")
+)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-UPLOAD_FOLDER    = os.path.join('static', 'uploads')
 ALLOWED_IMAGES   = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 ALLOWED_VIDEOS   = {'mp4', 'mov', 'webm', 'avi'}
 ALLOWED_ALL      = ALLOWED_IMAGES | ALLOWED_VIDEOS
 MAX_UPLOAD_MB    = 50
 
-app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH']  = MAX_UPLOAD_MB * 1024 * 1024
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 CATEGORIES = [
     'Design', 'Development', 'Video Editing', 'Photography',
@@ -34,8 +39,7 @@ import psycopg2.extras
 
 def get_db():
     return psycopg2.connect(
-        os.environ.get("DATABASE_URL") or
-        "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db",
+        os.environ.get("DATABASE_URL"),
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
@@ -304,10 +308,13 @@ def feed():
 
     query = """SELECT p.*, u.name, u.phone, u.skills AS skills, u.avatar
                FROM posts p
-               JOIN users u ON p.user_id = u.id"""
+               LEFT JOIN users u ON p.user_id = u.id"""
 
     params = []
     conds = []
+
+    conds.append("p.user_id IS NOT NULL")
+    conds.append("p.filename IS NOT NULL AND p.filename != ''")
 
     # ✅ FILTERS FIX
     if category:
@@ -366,7 +373,12 @@ def upload():
         ext        = file.filename.rsplit('.', 1)[1].lower()
         filename   = f"{uuid.uuid4().hex}.{ext}"
         media_type = 'video' if is_video(file.filename) else 'image'
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        if media_type == 'video':
+            result = cloudinary.uploader.upload(file, resource_type="video")
+        else:
+            result = cloudinary.uploader.upload(file)
+
+        image_url = result['secure_url']
 
         # ✅ FIX START
         db  = get_db()
@@ -377,7 +389,7 @@ def upload():
             INSERT INTO posts (user_id, filename, media_type, caption, price, category)
             VALUES (%s, %s, %s, %s, %s, %s)
             ''',
-            (session['user_id'], filename, media_type, caption, price, category)
+            (session['user_id'], image_url, media_type, caption, price, category)
         )
 
         db.commit()
@@ -389,6 +401,7 @@ def upload():
         return redirect(url_for('feed'))
 
     return render_template('upload.html')
+
 @app.route('/profile', defaults={'user_id': None})
 @app.route('/profile/<int:user_id>')
 @login_required
@@ -456,7 +469,8 @@ def edit_profile():
             if av and av.filename and allowed_file(av.filename):
                 ext = av.filename.rsplit('.', 1)[1].lower()
                 avatar = f"av_{uuid.uuid4().hex}.{ext}"
-                av.save(os.path.join(app.config['UPLOAD_FOLDER'], avatar))
+                result = cloudinary.uploader.upload(av)
+                avatar = result['secure_url']
 
         cur.execute(
             '''
@@ -536,10 +550,8 @@ def delete_post(post_id):
     post = cur.fetchone()
 
     if post:
-        filepath = os.path.join(app.root_path, 'static', 'uploads', post['filename'])
-
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        # Cloudinary use ho raha hai → local delete mat karo
+        pass
 
         cur.execute('DELETE FROM posts WHERE id=%s', (post_id,))
         cur.execute('DELETE FROM post_likes WHERE post_id=%s', (post_id,))
@@ -653,10 +665,26 @@ def send_message():
         'sender_id': session['user_id']
     })
 
+@app.route('/clear_posts')
+@login_required
+def clear_posts():
+    if session['user_id'] != 1:
+        return "Not allowed"
+
+    db = get_db()
+    cur = db.cursor()
+
+    # delete DB posts
+    cur.execute("DELETE FROM posts;")
+
+    db.commit()
+    cur.close()
+    db.close()
+
+    return "Posts + files cleared"
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
-
+    app.run(debug=True)
 
