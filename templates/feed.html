@@ -23,7 +23,7 @@
     <div class="cat-scroll">
       <a href="{{ url_for('feed', search=search) }}" class="cat-chip {% if not category %}active{% endif %}">✨ All</a>
       {% for cat in CATEGORIES %}
-      <a href="{{ url_for('feed', category=cat, search=search) }}" class="cat-chip {% if category==cat %}active{% endif %}">{{ cat }}</a>
+      <a href="{{ url_for('feed', category=cat, search=search) }}" class="cat-chip {% if category==cat %}active{% endif %}">{{ CATEGORY_EMOJIS.get(cat, '✨') }} {{ cat }}</a>
       {% endfor %}
     </div>
 
@@ -53,12 +53,13 @@
           <video class="pc-video" preload="metadata" controls muted>
             <source src="{{ p.filename }}"/>
           </video>
+            <p style="color:red; font-size:12px;">{{ p.filename }}</p>
           <div class="pc-video-badge">
             <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg> VIDEO
           </div>
             {% else %}
             <a href="{{ url_for('view_post', post_id=p.id) }}">
-               <img src="{{ p.filename }}" alt="post image" loading="lazy"
+               <img src="{{ p.filename }}" onerror="this.src='/static/default.png'" alt="post image" loading="lazy"
                  class="pc-img"/>
             </a>
             {% endif %}
@@ -66,7 +67,7 @@
           <div class="pc-price">₹{{ p.price }}</div>
           {% endif %}
           {% if p.category %}
-          <div class="pc-cat-badge">{{ p.category }}</div>
+          <div class="pc-cat-badge">{{ CATEGORY_EMOJIS.get(p.category, '✨') }} {{ p.category }}</div>
           {% endif %}
         </div>
 
@@ -135,6 +136,7 @@
       <p>{{ 'Try different keywords or browse all categories.' if search else 'Be the first to share a skill!' }}</p>
       <a href="{{ url_for('upload') }}" class="btn-hero-primary" style="margin-top:16px">Post Your Skill</a>
     </div>
+
     {% endif %}
 
   </div>
@@ -151,7 +153,7 @@
       <h3>🔥 Browse by Category</h3>
       <div class="fsw-cats">
         {% for cat in CATEGORIES %}
-        <a href="{{ url_for('feed', category=cat) }}" class="fsw-cat {% if category==cat %}active{% endif %}">{{ cat }}</a>
+        <a href="{{ url_for('feed', category=cat) }}" class="fsw-cat {% if category==cat %}active{% endif %}">{{ CATEGORY_EMOJIS.get(cat, '✨') }} {{ cat }}</a>
         {% endfor %}
       </div>
     </div>

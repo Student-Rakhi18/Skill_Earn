@@ -11,6 +11,11 @@ from functools import wraps
 import cloudinary
 import cloudinary.uploader
 
+from datetime import datetime
+import pytz
+
+IST = pytz.timezone('Asia/Kolkata')
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -31,16 +36,43 @@ MAX_UPLOAD_MB    = 50
 app.config['MAX_CONTENT_LENGTH']  = MAX_UPLOAD_MB * 1024 * 1024
 
 CATEGORIES = [
-    'Design', 'Development', 'Video Editing', 'Photography',
-    'Writing', 'Music', 'Marketing', 'Data & Excel', 'Teaching', 'Other'
+    'Development & Tech',
+    'Design & Creative',
+    'Video & Photo Editing',
+    'Photography',
+    'Art & Sketching',
+    'Writing & Content Creation',
+    'Music & Audio',
+    'Marketing & Business',
+    'Data Analysis & Office Tools',
+    'Teaching & Education',
+    'Personal Development',
+    'AI & Digital Tools',
+    'Career & Freelancing',
+    'Other'
 ]
+CATEGORY_EMOJIS = {
+    'Development & Tech': '💻',
+    'Design & Creative': '🎨',
+    'Video & Photo Editing': '🎬',
+    'Photography': '📸',
+    'Art & Sketching': '✏️',
+    'Writing & Content Creation': '✍️',
+    'Music & Audio': '🎵',
+    'Marketing & Business': '📢',
+    'Data Analysis & Office Tools': '📊',
+    'Teaching & Education': '🧑‍🏫',
+    'Personal Development': '🧠',
+    'AI & Digital Tools': '🤖',
+    'Career & Freelancing': '💼',
+    'Other': '✨'
+}
 
 # ── Database ──────────────────────────────────────────────────────────────────
 import psycopg2.extras
-
 def get_db():
     return psycopg2.connect(
-        "postgresql://skillearn_db_user:Y0uBqPSgAaOSNZioOMx1ifl90IdzbTDF@dpg-d78jrfffte5s739518ng-a.ohio-postgres.render.com/skillearn_db",
+        os.environ.get("DATABASE_URL"),
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
@@ -142,18 +174,41 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+from datetime import datetime, timedelta
+
 @app.route('/delete_for_everyone/<int:msg_id>', methods=['POST'])
 @login_required
 def delete_for_everyone(msg_id):
     db = get_db()
     cur = db.cursor()
 
+    # message fetch karo
     cur.execute("""
-        DELETE FROM messages
+        SELECT created_at FROM messages
         WHERE id=%s AND sender_id=%s
     """, (msg_id, session['user_id']))
 
+    msg = cur.fetchone()
+
+    if not msg:
+        return jsonify({'status': 'error'})
+
+    created_time = msg['created_at']
+
+    from datetime import datetime, timedelta,timezone
+    now = datetime.now(timezone.utc)
+
+    if created_time.tzinfo is None:
+        created_time = created_time.replace(tzinfo=timezone.utc)
+
+    # ⛔ 1 hour limit check
+    if now - created_time > timedelta(hours=1):
+        return jsonify({'status': 'expired'})
+
+    # ✅ delete allowed
+    cur.execute("DELETE FROM messages WHERE id=%s", (msg_id,))
     db.commit()
+
     cur.close()
     db.close()
 
@@ -186,8 +241,30 @@ def delete_for_me(msg_id):
 # ── Context processor – makes categories available in all templates ────────────
 @app.context_processor
 def inject_globals():
-    return dict(CATEGORIES=CATEGORIES)
+    unread_count = 0
 
+    if 'user_id' in session:
+        db = get_db()
+        cur = db.cursor()
+
+        cur.execute("""
+            SELECT COUNT(DISTINCT sender_id) as count
+            FROM messages
+            WHERE receiver_id=%s 
+            AND is_seen=FALSE
+        """, (session['user_id'],))
+
+        row = cur.fetchone()
+        unread_count = row['count'] if row else 0
+
+        cur.close()
+        db.close()
+
+    return dict(
+        CATEGORIES=CATEGORIES,
+        CATEGORY_EMOJIS=CATEGORY_EMOJIS,
+        unread_count=unread_count
+    )
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -329,7 +406,7 @@ def feed():
     if conds:
         query += " WHERE " + " AND ".join(conds)
 
-    query += " ORDER BY p.created_at DESC"
+    query += " ORDER BY p.created_at DESC LIMIT 50"
 
     # ✅ EXECUTE QUERY
     cur.execute(query, params)
@@ -367,6 +444,13 @@ def upload():
             return render_template('upload.html')
 
         file = request.files['media']
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+
+        if size > MAX_UPLOAD_MB * 1024 * 1024:
+            flash("File too large!", "error")
+            return render_template('upload.html')
         if not allowed_file(file.filename):
             flash('Unsupported file type.', 'error')
             return render_template('upload.html')
@@ -591,9 +675,19 @@ def chats():
 
     # sab users lao except current user
     cur.execute("""
-        SELECT id, name, avatar FROM users
-        WHERE id != %s
-    """, (session['user_id'],))
+        SELECT 
+            u.id, 
+            u.name, 
+            u.avatar,
+            MAX(m.created_at) as last_msg_time
+        FROM users u
+        JOIN messages m 
+          ON (u.id = m.sender_id AND m.receiver_id=%s)
+          OR (u.id = m.receiver_id AND m.sender_id=%s)
+        WHERE u.id != %s
+        GROUP BY u.id, u.name, u.avatar
+        ORDER BY last_msg_time DESC
+    """, (session['user_id'], session['user_id'], session['user_id']))
 
     users = cur.fetchall()
 
@@ -612,7 +706,7 @@ def chat(user_id):
     cur.execute("""
         UPDATE messages
         SET is_seen = TRUE
-        WHERE receiver_id=%s AND sender_id=%s
+        WHERE receiver_id=%s AND sender_id=%s AND is_seen=FALSE
     """, (session['user_id'], user_id))
 
     cur.execute("""
@@ -622,10 +716,40 @@ def chat(user_id):
             OR
             (sender_id=%s AND receiver_id=%s AND deleted_by_receiver=FALSE)
         )
-        ORDER BY created_at
+        ORDER BY created_at ASC
     """, (session['user_id'], user_id, user_id, session['user_id']))
 
     messages = cur.fetchall()
+
+    from datetime import datetime, timedelta
+
+    now = datetime.now(IST).date()
+    prev_date = None
+
+    for m in messages:
+        if m['created_at']:
+            local_time = m['created_at'].replace(tzinfo=pytz.utc).astimezone(IST)
+
+            msg_date = local_time.date()
+
+            # label decide
+            if msg_date == now:
+                label = "Today"
+            elif msg_date == now - timedelta(days=1):
+                label = "Yesterday"
+            else:
+                label = local_time.strftime("%d %b")
+
+            # ✅ only show when date changes
+            if msg_date != prev_date:
+                m['show_date'] = True
+                m['date_label'] = label
+                prev_date = msg_date
+            else:
+                m['show_date'] = False
+
+            # time only
+            m['time_only'] = local_time.strftime("%I:%M %p")
 
     cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
     user = cur.fetchone()
@@ -642,6 +766,8 @@ def send_message():
     data = request.get_json()
     receiver_id = data['receiver_id']
     message = data['message']
+    if not message.strip():
+        return jsonify({'status': 'error'})
 
     db = get_db()
     cur = db.cursor()
@@ -658,12 +784,15 @@ def send_message():
     cur.close()
     db.close()
 
+    local_time = msg['created_at'].replace(tzinfo=pytz.utc).astimezone(IST)
+
     return jsonify({
         'status': 'ok',
         'id': msg['id'],
         'message': message,
-        'time': msg['created_at'].strftime("%H:%M"),
-        'sender_id': session['user_id']
+        'time': local_time.strftime("%I:%M %p"),
+        'sender_id': session['user_id'],
+        'seen': False
     })
 
 # ── Run ───────────────────────────────────────────────────────────────────────

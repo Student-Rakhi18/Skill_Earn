@@ -3,30 +3,82 @@
 
 <div class="chat-container">
 
-  <div class="chat-header">
-    {{ user.name }}
-  </div>
+    <!-- Popup Menu -->
+    <div id="msgMenu" class="msg-menu" style="display:none; position:absolute;">
+        <button onclick="handleDelete('me')">❌ Delete for Me</button>
+        <button id="delEveryoneBtn" onclick="handleDelete('all')">🗑 Delete for Everyone</button>
+    </div>
 
-  <div class="chat-box">
-    {% for m in messages %}
-      <div class="msg {% if m.sender_id == session['user_id'] %}me{% else %}other{% endif %}">
-        {{ m.message }}
-      </div>
-    {% endfor %}
-  </div>
+    <div class="chat-header">
+        {{ user.name }}
+    </div>
 
-  <div class="chat-input">
-    <input type="text" id="msg" placeholder="Type message...">
-    <button onclick="sendMsg()">Send</button>
-  </div>
+    <div class="chat-box">
+        {% for m in messages %}
+            {% if m.show_date %}
+        <div class="date-separator">
+            <span>{{ m.date_label }}</span>
+        </div>
+        {% endif %}
+        <div class="msg {% if m.sender_id == session['user_id'] %}me{% else %}other{% endif %}"
+             ondblclick="openMenu({{ m.id }}, {{ m.sender_id }}, this)"
+             ontouchstart="startPress(event, {{ m.id }}, {{ m.sender_id }}, this)"
+             ontouchend="cancelPress()"
+             ontouchmove="cancelPress()">
+
+        <!-- MESSAGE TEXT -->
+        <div class="msg-text">
+            {% if m.sender_id == session['user_id'] and m.deleted_by_sender %}
+                <i style="color:gray;">Message deleted</i>
+
+            {% elif m.receiver_id == session['user_id'] and m.deleted_by_receiver %}
+                <i style="color:gray;">Message deleted</i>
+
+            {% else %}
+                {{ m.message }}
+            {% endif %}
+        </div>
+
+    <!-- ✅ TIME ADD -->
+    <div class="msg-time">
+    <span class="time">{{ m.time_only }}</span>
+
+    {% if m.sender_id == session['user_id'] %}
+        <span class="ticks">
+            {% if m.is_seen %}
+                ✔✔
+            {% else %}
+                ✔
+            {% endif %}
+        </span>
+    {% endif %}
+</div>
+    </div>
+        {% endfor %}
+    </div>
+
+    <div class="chat-input">
+        <input type="text" id="msg" placeholder="Type message...">
+        <button onclick="sendMsg()">Send</button>
+    </div>
 
 </div>
 
 <script>
+const CURRENT_USER_ID = {{ session['user_id'] }};
+</script>
+
+<script>
+// ── GLOBAL STATE ─────────────────────────
+let selectedMsgId = null;
+let isSender = false;
+let pressTimer = null;
+
+// ── Send Message ─────────────────────────
 function sendMsg() {
     let msg = document.getElementById("msg").value;
 
-    if (!msg.trim()) return;  // ❗ empty message block
+    if (!msg.trim()) return;
 
     fetch("/send_message", {
         method: "POST",
@@ -38,8 +90,104 @@ function sendMsg() {
             message: msg
         })
     })
-    .then(() => location.reload());
+    .then(res => res.json())
+    .then(data => {
+        let box = document.querySelector(".chat-box");
+
+        let msgDiv = document.createElement("div");
+        msgDiv.className = "msg me";
+        msgDiv.innerHTML = `
+          <div class="msg-text">${data.message}</div>
+          <div class="msg-time">
+              <span class="time">${data.time}</span>
+              <span class="ticks">✔</span>
+          </div>
+        `;
+        box.appendChild(msgDiv);
+        box.scrollTop = box.scrollHeight;
+
+        document.getElementById("msg").value = "";
+    });
 }
+
+// ── Open Menu ─────────────────────────
+function openMenu(id, senderId, element) {
+    selectedMsgId = id;
+    isSender = (senderId == CURRENT_USER_ID);
+
+    const menu = document.getElementById("msgMenu");
+    const rect = element.getBoundingClientRect();
+
+    menu.style.top = (rect.top + window.scrollY - 10) + "px";
+    menu.style.left = (rect.left + rect.width / 2) + "px";
+    menu.style.transform = "translateX(-50%)";
+
+    menu.style.display = "block";
+
+    document.getElementById("delEveryoneBtn").style.display =
+        isSender ? "block" : "none";
+}
+
+// ── Long Press (Mobile) ─────────────────
+function startPress(e, id, senderId, element) {
+    pressTimer = setTimeout(() => {
+        openMenu(id, senderId, element);
+    }, 500);
+}
+
+function cancelPress() {
+    if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+    }
+}
+
+// ── Delete Handler ─────────────────────
+function handleDelete(type) {
+    if (!selectedMsgId) return;
+
+    let url = type === 'all'
+        ? `/delete_for_everyone/${selectedMsgId}`
+        : `/delete_for_me/${selectedMsgId}`;
+
+    fetch(url, { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+
+            if (data.status === 'deleted' || data.status === 'hidden') {
+                location.reload();
+            }
+            else if (data.status === 'expired') {
+                alert("⏰ You can delete for everyone only within 1 hour!");
+            }
+            else {
+                alert("❌ Delete failed");
+            }
+
+        })
+        .catch(() => {
+            alert("❌ Error occurred");
+        });
+}
+
+// ── Close menu on outside click ─────────
+document.addEventListener("click", function(e) {
+    if (!e.target.closest(".msg") && !e.target.closest(".msg-menu")) {
+        document.getElementById("msgMenu").style.display = "none";
+    }
+});
+
+document.getElementById("msg").addEventListener("keypress", function(e){
+    if(e.key === "Enter"){
+        sendMsg();
+    }
+});
+
+window.onload = () => {
+    let box = document.querySelector(".chat-box");
+    box.scrollTop = box.scrollHeight;
+};
+
 </script>
 
 {% endblock %}

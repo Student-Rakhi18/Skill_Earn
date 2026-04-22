@@ -48,7 +48,7 @@
             <select name="category" class="uf-select">
               <option value="">Select a category</option>
               {% for cat in CATEGORIES %}
-              <option value="{{ cat }}">{{ cat }}</option>
+              <option value="{{ cat }}">{{ CATEGORY_EMOJIS.get(cat, '✨') }} {{ cat }}</option>
               {% endfor %}
             </select>
           </div>
@@ -119,6 +119,13 @@
   fileInput.addEventListener('change', () => {
     if (fileInput.files[0]) showPreview(fileInput.files[0]);
   });
+
+  const allowed = ['image/jpeg','image/png','image/webp','video/mp4'];
+
+    if(!allowed.includes(file.type)){
+        alert("Unsupported file!");
+        return;
+    }
 
   function showPreview(file) {
     const url = URL.createObjectURL(file);

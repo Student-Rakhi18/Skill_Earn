@@ -88,7 +88,7 @@ input, textarea, select { font-family: inherit; }
   display: flex; align-items: center; gap: 12px;
   padding: 11px 14px; border-radius: var(--radius);
   font-size: .9rem; font-weight: 500; color: var(--muted);
-  transition: all .18s;
+  transition: all .18s; position: relative;
 }
 .sn-link:hover { background: var(--bg); color: var(--text); }
 .sn-link.active { background: var(--blue-light); color: var(--blue); font-weight: 600; }
@@ -150,7 +150,7 @@ input, textarea, select { font-family: inherit; }
   box-shadow: 0 -2px 16px rgba(0,0,0,.07);
 }
 .bn-item {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative;
   font-size: .65rem; font-weight: 500; color: var(--muted); padding: 4px 16px;
   transition: color .18s;
 }
@@ -428,8 +428,8 @@ input, textarea, select { font-family: inherit; }
 .fsb-btn:hover { background: var(--blue-dark); }
 
 /* Category chips */
-.cat-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 20px; }
-.cat-scroll::-webkit-scrollbar { height: 0; }
+.cat-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 20px; -webkit-overflow-scrolling: touch; }
+.cat-scroll::-webkit-scrollbar { height: 0; display: none; }
 .cat-chip {
   white-space: nowrap; padding: 7px 16px;
   background: var(--surface); border: 1.5px solid var(--border);
@@ -814,6 +814,7 @@ input, textarea, select { font-family: inherit; }
 }
 
 .msg {
+  position: relative;
   padding: 8px 12px;
   margin: 5px 0;
   border-radius: 10px;
@@ -867,4 +868,78 @@ button, a, .post-card, .sn-link {
   height: 250px;
   object-fit: cover;
   background: #f2f2f2;
+}
+
+.chat-badge {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: red;
+  color: white;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 50%;
+}
+
+.msg-menu {
+  position: absolute;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  padding: 8px;
+  z-index: 1000;
+  min-width: 160px;
+}
+
+.msg-menu button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.msg-menu button:hover {
+  background: #f2f2f2;
+}
+
+.msg-time {
+    font-size: 12px;
+    color: #e0e0e0;
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+    margin-top: 4px;
+    text-align: right;
+}
+
+.msg-time .seen {
+    color: #4fc3f7;
+    font-weight: bold;
+}
+
+.ticks {
+    font-size: 12px;
+}
+
+.date-separator {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.date-separator span {
+    background: linear-gradient(135deg, #2c2c2c, #444);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 500;
+    font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.chat-box {
+    display: flex;
+    flex-direction: column;
 }

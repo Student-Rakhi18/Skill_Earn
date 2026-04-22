@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <title>{% block title %}SkillEarn{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -10,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}" data-user-id="{{ session.get('user_id') }}">
 
 {% if session.get('user_id') %}
 <!-- ── Desktop Sidebar ─────────────────────────────────────────────────────── -->
@@ -33,7 +34,15 @@
       </span>
       <span>Post Skill</span>
     </a>
-    <a href="{{ url_for('profile', user_id=session.get('user_id')) }}" class="sn-link {% if request.endpoint=='profile' %}active{% endif %}">      <span class="sn-icon">
+    <a href="{{ url_for('chats') }}" class="sn-link {% if request.endpoint=='chats' %}active{% endif %}">
+      <span class="sn-icon">💬</span>
+      <span>Chats</span>
+      {% if unread_count > 0 %}
+      <span class="chat-badge">{{ unread_count }}</span>
+      {% endif %}
+    </a>
+    <a href="{{ url_for('profile', user_id=session.get('user_id')) }}" class="sn-link {% if request.endpoint=='profile' %}active{% endif %}">
+        <span class="sn-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </span>
       <span>Profile</span>
@@ -44,7 +53,7 @@
     <div class="sidebar-user">
       <div class="su-avatar">{{ (session.get('user_name','U'))[0]|upper }}</div>
       <div class="su-info">
-        <span class="su-name">{{ session.user_name }}</span>
+        <span class="su-name">{{ session.get('user_name', 'User') }}</span>
         <small>Freelancer</small>
       </div>
     </div>
@@ -85,7 +94,7 @@
 {% endwith %}
 
 <!-- ── Page Content ───────────────────────────────────────────────────────── -->
-<main class="page-wrap {% if not session.user_id %}page-auth{% endif %}">
+<main class="page-wrap {% if not session.get('user_id') %}page-auth{% endif %}">
   {% block content %}{% endblock %}
 </main>
 
@@ -93,6 +102,13 @@
 {% if session.get('user_id') %}
 <nav class="bottom-nav">
   <a href="{{ url_for('feed') }}"    class="bn-item {% if request.endpoint=='feed'    %}active{% endif %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>Feed</span></a>
+  <a href="{{ url_for('chats') }}" class="bn-item {% if request.endpoint=='chats' %}active{% endif %}">
+    <span>💬</span>
+    <span>Chats</span>
+    {% if unread_count > 0 %}
+      <span class="chat-badge">{{ unread_count }}</span>
+    {% endif %}
+  </a>
   <a href="{{ url_for('upload') }}"  class="bn-item bn-post"><div class="bn-post-circle">+</div></a>
   <a href="{{ url_for('profile', user_id=session.get('user_id')) }}" class="bn-item {% if request.endpoint=='profile' %}active{% endif %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span></a>
 </nav>
@@ -100,27 +116,6 @@
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% block extra_scripts %}{% endblock %}
-
-<script>
-function likePost(postId, btn){
-  fetch('/like/' + postId, {
-    method: 'POST'
-  })
-  .then(res => res.json())
-  .then(data => {
-
-    const heart = btn.querySelector('.like-heart');
-    const count = btn.querySelector('.like-num');
-
-    if(heart && count){
-      heart.innerHTML = data.liked ? '❤️' : '🤍';
-      count.innerText = data.count;
-    }
-
-  })
-  .catch(err => console.log("Like error:", err));
-}
-</script>
 
 </body>
 </html>
