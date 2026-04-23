@@ -21,9 +21,16 @@
 
     <!-- Category chips -->
     <div class="cat-scroll">
-      <a href="{{ url_for('feed', search=search) }}" class="cat-chip {% if not category %}active{% endif %}">✨ All</a>
+      <a href="{{ url_for('feed', search=search) }}"
+         class="cat-chip {% if not category %}active{% endif %}">
+         ✨ All
+      </a>
+
       {% for cat in CATEGORIES %}
-      <a href="{{ url_for('feed', category=cat, search=search) }}" class="cat-chip {% if category==cat %}active{% endif %}">{{ CATEGORY_EMOJIS.get(cat, '✨') }} {{ cat }}</a>
+      <a href="{{ url_for('feed', category=cat, search=search) }}"
+         class="cat-chip {% if category==cat %}active{% endif %}">
+         {{ CATEGORY_EMOJIS.get(cat, '✨') }} {{ cat }}
+      </a>
       {% endfor %}
     </div>
 
@@ -97,7 +104,9 @@
           </a>
 
           <p class="pc-caption">{{ p.caption or '' }}</p>
-
+          <p class="pc-date">
+            {{ p.created_at.strftime("%d %b %Y, %I:%M %p") if p.created_at else "" }}
+          </p>
           {% if p.skills %}
           <div class="pc-tags">
             {% for s in p.skills.split(',')[:3] %}
