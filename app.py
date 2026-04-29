@@ -11,7 +11,6 @@ from functools import wraps
 import cloudinary
 import cloudinary.uploader
 
-from datetime import datetime
 import pytz
 
 IST = pytz.timezone('Asia/Kolkata')
