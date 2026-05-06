@@ -72,8 +72,7 @@ import psycopg2.extras
 def get_db():
     return psycopg2.connect(
         os.environ.get("DATABASE_URL"),
-        cursor_factory=psycopg2.extras.RealDictCursor,
-        sslmode="require"
+        cursor_factory=psycopg2.extras.RealDictCursor
     )
 
 def init_db():
@@ -794,8 +793,6 @@ def send_message():
         'sender_id': session['user_id'],
         'seen': False
     })
-
-
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
