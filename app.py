@@ -794,6 +794,10 @@ def send_message():
         'seen': False
     })
 
+
+with app.app_context():
+    db.create_all()
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
